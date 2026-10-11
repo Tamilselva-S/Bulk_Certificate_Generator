@@ -1,0 +1,35 @@
+# ── Virtual environments ──────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ── Python cache ──────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# ── Environment files (may contain secrets) ───────────────────────────────────
+.env
+
+# ── SQLite database files ─────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Generated certificate PDFs ────────────────────────────────────────────────
+generated_certificates/
+
+# ── Test artifacts ────────────────────────────────────────────────────────────
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# ── IDE / OS files ────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.DS_Store
+Thumbs.db

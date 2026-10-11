@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CertGen – Bulk Certificate Generator</title>
+  <meta name="description" content="Generate bulk PDF certificates for any event or course. Submit recipients, track progress in real-time, and download individual certificates instantly." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Tokens ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-base:       #070b14;
+      --bg-card:       rgba(255,255,255,0.04);
+      --bg-card-hover: rgba(255,255,255,0.07);
+      --bg-input:      rgba(255,255,255,0.06);
+      --border:        rgba(255,255,255,0.09);
+      --border-focus:  rgba(99,179,237,0.6);
+
+      --gold:    #f5c842;
+      --gold-lt: #fde68a;
+      --blue:    #63b3ed;
+      --blue-dk: #2b6cb0;
+      --green:   #68d391;
+      --red:     #fc8181;
+      --orange:  #f6ad55;
+      --purple:  #b794f4;
+
+      --text-primary:   #f0f4ff;
+      --text-secondary: #94a3b8;
+      --text-muted:     #4a5568;
+
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-xl: 28px;
+
+      --shadow-glow:  0 0 40px rgba(99,179,237,0.12);
+      --shadow-card:  0 4px 32px rgba(0,0,0,0.45);
+      --shadow-gold:  0 0 24px rgba(245,200,66,0.25);
+
+      --transition: 0.25s cubic-bezier(.4,0,.2,1);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Background orbs ──────────────────────────────────────────────────── */
+    .bg-orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.18;
+      pointer-events: none;
+      z-index: 0;
+      animation: float 12s ease-in-out infinite;
+    }
+    .bg-orb-1 { width: 600px; height: 600px; background: #2b6cb0; top: -200px; left: -150px; }
+    .bg-orb-2 { width: 500px; height: 500px; background: #744210; bottom: -100px; right: -100px; animation-delay: -6s; }
+    .bg-orb-3 { width: 350px; height: 350px; background: #44337a; top: 40%; left: 50%; animation-delay: -3s; }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50%       { transform: translateY(-30px) scale(1.05); }
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────────────────── */
+    .app-wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 20px 80px; }
+
+    /* ── Header ─────────────────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 28px 0 48px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 48px;
+    }
+    .logo { display: flex; align-items: center; gap: 14px; }
+    .logo-icon {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, var(--gold), var(--orange));
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      box-shadow: var(--shadow-gold);
+    }
+    .logo-text {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.6rem;
+      background: linear-gradient(90deg, var(--gold-lt), var(--gold));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .logo-sub { font-size: 0.72rem; color: var(--text-muted); letter-spacing: .06em; text-transform: uppercase; }
+
+    .api-status {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.8rem; color: var(--text-secondary);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px; padding: 6px 14px;
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--text-muted);
+      transition: background var(--transition);
+    }
+    .status-dot.online  { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .status-dot.offline { background: var(--red); }
+
+    /* ── Section title ───────────────────────────────────────────────────────── */
+    .section-label {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 0.72rem; font-weight: 600;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: var(--gold); margin-bottom: 16px;
+    }
+    .section-label::after {
+      content: ''; flex: 1;
+      height: 1px; background: linear-gradient(90deg, var(--gold) 0%, transparent 100%);
+      opacity: 0.3;
+    }
+    h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 6px; color: var(--text-primary); }
+    .section-desc { color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 28px; }
+
+    /* ── Card ────────────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 32px;
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow-card);
+      transition: border-color var(--transition);
+    }
+    .card:hover { border-color: rgba(255,255,255,0.14); }
+
+    /* ── Form elements ───────────────────────────────────────────────────────── */
+    .form-group { margin-bottom: 20px; }
+    label {
+      display: block;
+      font-size: 0.82rem; font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 8px; letter-spacing: .04em;
+    }
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.92rem;
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+    }
+    input[type="text"]:focus, textarea:focus {
+      border-color: var(--border-focus);
+      background: rgba(99,179,237,0.05);
+      box-shadow: 0 0 0 3px rgba(99,179,237,0.12);
+    }
+    input::placeholder, textarea::placeholder { color: var(--text-muted); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
+
+    /* ── Recipients ──────────────────────────────────────────────────────────── */
+    .recipients-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .recipients-count {
+      font-size: 0.8rem; font-weight: 600;
+      color: var(--blue); background: rgba(99,179,237,0.1);
+      border: 1px solid rgba(99,179,237,0.2);
+      border-radius: 20px; padding: 3px 12px;
+    }
+    .recipients-table-wrap {
+      max-height: 280px; overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md); margin-bottom: 12px;
+    }
+    .recipients-table-wrap::-webkit-scrollbar { width: 4px; }
+    .recipients-table-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      position: sticky; top: 0;
+      background: rgba(7,11,20,0.9);
+      padding: 10px 14px; text-align: left;
+      font-size: 0.75rem; font-weight: 600;
+      color: var(--text-muted); letter-spacing: .08em; text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr { transition: background var(--transition); animation: rowIn 0.25s ease both; }
+    tbody tr:hover { background: var(--bg-card-hover); }
+    @keyframes rowIn { from { opacity:0; transform: translateX(-8px); } to { opacity:1; transform: translateX(0); } }
+    td {
+      padding: 10px 14px; font-size: 0.88rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+    tr:last-child td { border-bottom: none; }
+    .empty-state { text-align: center; padding: 40px; color: var(--text-muted); font-size: 0.88rem; }
+    .empty-state .icon { font-size: 2.5rem; margin-bottom: 8px; }
+    .btn-icon {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-muted); font-size: 1.1rem;
+      padding: 4px 8px; border-radius: 6px;
+      transition: color var(--transition), background var(--transition);
+    }
+    .btn-icon:hover { color: var(--red); background: rgba(252,129,129,0.1); }
+    .add-recipient-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
+    @media (max-width: 640px) { .add-recipient-row { grid-template-columns: 1fr; } }
+
+    /* ── CSV drop ────────────────────────────────────────────────────────────── */
+    .csv-drop {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-md);
+      padding: 28px; text-align: center; cursor: pointer;
+      transition: border-color var(--transition), background var(--transition);
+      margin-bottom: 12px;
+    }
+    .csv-drop:hover, .csv-drop.drag-over { border-color: var(--blue); background: rgba(99,179,237,0.04); }
+    .csv-drop .drop-icon { font-size: 2rem; margin-bottom: 8px; }
+    .csv-drop p { font-size: 0.88rem; color: var(--text-secondary); }
+    .csv-drop span { color: var(--blue); font-weight: 600; }
+    #csv-file-input { display: none; }
+
+    /* ── Buttons ─────────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 11px 22px; border-radius: var(--radius-sm);
+      font-family: 'Inter', sans-serif; font-size: 0.88rem; font-weight: 600;
+      cursor: pointer; border: none; outline: none;
+      transition: all var(--transition); white-space: nowrap;
+    }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary {
+      background: linear-gradient(135deg, #2b6cb0, #63b3ed);
+      color: #fff; box-shadow: 0 4px 18px rgba(43,108,176,0.45);
+    }
+    .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(43,108,176,0.6); }
+    .btn-gold {
+      background: linear-gradient(135deg, #c05621, #f6ad55, #f5c842);
+      color: #1a0a00; font-weight: 700;
+      box-shadow: var(--shadow-gold); letter-spacing: .02em;
+    }
+    .btn-gold:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(245,200,66,0.45); }
+    .btn-outline {
+      background: transparent; border: 1px solid var(--border); color: var(--text-secondary);
+    }
+    .btn-outline:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); background: rgba(99,179,237,0.05); }
+    .btn-sm { padding: 7px 14px; font-size: 0.8rem; }
+    .btn-danger { background: rgba(252,129,129,0.12); border: 1px solid rgba(252,129,129,0.25); color: var(--red); }
+    .btn-danger:hover:not(:disabled) { background: rgba(252,129,129,0.22); }
+
+    /* ── Spinner ─────────────────────────────────────────────────────────────── */
+    .spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.25);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Progress bar ────────────────────────────────────────────────────────── */
+    .progress-bar-wrap { background: rgba(255,255,255,0.05); border-radius: 99px; height: 10px; overflow: hidden; margin: 10px 0; }
+    .progress-bar-fill {
+      height: 100%; border-radius: 99px;
+      background: linear-gradient(90deg, var(--blue-dk), var(--blue), var(--gold));
+      transition: width 0.6s cubic-bezier(.4,0,.2,1);
+      position: relative; overflow: hidden;
+    }
+    .progress-bar-fill::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%);
+      animation: shimmer 1.6s ease infinite;
+    }
+    @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+    /* ── Badge ───────────────────────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 99px;
+      font-size: 0.72rem; font-weight: 600;
+      letter-spacing: .05em; text-transform: uppercase;
+    }
+    .badge-queued    { background: rgba(74,85,104,0.4);   color: var(--text-muted); }
+    .badge-running   { background: rgba(99,179,237,0.15); color: var(--blue); }
+    .badge-completed { background: rgba(104,211,145,0.15);color: var(--green); }
+    .badge-failed    { background: rgba(252,129,129,0.15);color: var(--red); }
+    .badge-pending   { background: rgba(246,173,85,0.15); color: var(--orange); }
+    .badge-success   { background: rgba(104,211,145,0.15);color: var(--green); }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .badge-running .badge-dot { animation: pulse 1s ease infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+    /* ── Stats ───────────────────────────────────────────────────────────────── */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 20px 0; }
+    @media (max-width: 700px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+    .stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; text-align: center; }
+    .stat-value {
+      font-size: 1.8rem; font-weight: 800;
+      background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .stat-value.green { background: linear-gradient(135deg, var(--green), #c6f6d5); -webkit-background-clip: text; background-clip: text; }
+    .stat-value.red   { background: linear-gradient(135deg, var(--red), #fed7d7);   -webkit-background-clip: text; background-clip: text; }
+    .stat-value.blue  { background: linear-gradient(135deg, var(--blue), #bee3f8);  -webkit-background-clip: text; background-clip: text; }
+    .stat-label { font-size: 0.75rem; color: var(--text-muted); font-weight: 500; margin-top: 2px; text-transform: uppercase; letter-spacing: .06em; }
+
+    /* ── Cert list ───────────────────────────────────────────────────────────── */
+    .cert-list { display: flex; flex-direction: column; gap: 8px; }
+    .cert-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md);
+      transition: border-color var(--transition), background var(--transition);
+      animation: rowIn 0.2s ease both;
+    }
+    .cert-item:hover { border-color: rgba(255,255,255,0.15); background: var(--bg-card-hover); }
+    .cert-item.success { border-left: 3px solid var(--green); }
+    .cert-item.failed  { border-left: 3px solid var(--red); }
+    .cert-item.pending, .cert-item.processing { border-left: 3px solid var(--orange); }
+    .cert-info { min-width: 0; }
+    .cert-name  { font-weight: 600; font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cert-email { font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px; }
+    .cert-error { font-size: 0.75rem; color: var(--red); margin-top: 4px; }
+    .cert-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+    /* ── Toast ───────────────────────────────────────────────────────────────── */
+    #toast-container { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 9999; }
+    .toast {
+      display: flex; align-items: center; gap: 12px;
+      min-width: 280px; max-width: 380px;
+      padding: 14px 18px;
+      background: rgba(15,20,35,0.96); border: 1px solid var(--border);
+      border-radius: var(--radius-md); box-shadow: var(--shadow-card); backdrop-filter: blur(20px);
+      animation: toastIn 0.35s cubic-bezier(.34,1.56,.64,1) both; font-size: 0.88rem;
+    }
+    .toast.removing { animation: toastOut 0.3s ease forwards; }
+    @keyframes toastIn  { from { transform: translateX(120%); opacity:0; } to { transform: translateX(0); opacity:1; } }
+    @keyframes toastOut { from { transform: translateX(0); opacity:1; } to { transform: translateX(120%); opacity:0; } }
+    .toast-icon { font-size: 1.2rem; flex-shrink: 0; }
+    .toast-title { font-weight: 600; margin-bottom: 2px; }
+    .toast-msg   { color: var(--text-secondary); font-size: 0.82rem; }
+    .toast.success { border-left: 3px solid var(--green); }
+    .toast.error   { border-left: 3px solid var(--red); }
+    .toast.info    { border-left: 3px solid var(--blue); }
+    .toast.warning { border-left: 3px solid var(--orange); }
+
+    /* ── Tabs ────────────────────────────────────────────────────────────────── */
+    .tabs { display: flex; gap: 4px; margin-bottom: 32px; }
+    .tab-btn {
+      padding: 10px 22px; background: transparent;
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      color: var(--text-secondary); font-family: 'Inter', sans-serif;
+      font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: all var(--transition);
+    }
+    .tab-btn.active {
+      background: linear-gradient(135deg, rgba(43,108,176,0.3), rgba(99,179,237,0.2));
+      border-color: rgba(99,179,237,0.4); color: var(--blue);
+      box-shadow: 0 0 16px rgba(99,179,237,0.1);
+    }
+    .tab-btn:hover:not(.active) { border-color: rgba(255,255,255,0.15); color: var(--text-primary); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: translateY(0); } }
+
+    /* ── History ─────────────────────────────────────────────────────────────── */
+    .job-history-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-md); margin-bottom: 10px;
+      cursor: pointer; transition: all var(--transition);
+    }
+    .job-history-item:hover { border-color: rgba(99,179,237,0.3); background: var(--bg-card-hover); transform: translateX(3px); }
+    .job-info h4 { font-size: 0.95rem; font-weight: 600; }
+    .job-info p  { font-size: 0.8rem; color: var(--text-secondary); margin-top: 3px; }
+
+    /* ── Misc ────────────────────────────────────────────────────────────────── */
+    .hidden { display: none !important; }
+    .mt-24  { margin-top: 24px; }
+    .flex-end { display: flex; justify-content: flex-end; gap: 10px; }
+    .flex-between { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+
+    .job-id-box {
+      background: rgba(99,179,237,0.08);
+      border: 1px solid rgba(99,179,237,0.2);
+      border-radius: var(--radius-sm); padding: 10px 16px;
+      font-family: 'Courier New', monospace; font-size: 0.82rem;
+      color: var(--blue); word-break: break-all;
+      display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+    }
+    .copy-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-muted); font-size: 1rem; flex-shrink: 0;
+      transition: color var(--transition);
+    }
+    .copy-btn:hover { color: var(--blue); }
+
+    .lookup-bar { display: flex; gap: 10px; margin-bottom: 24px; }
+    .lookup-bar input { flex: 1; }
+
+    .divider {
+      display: flex; align-items: center; gap: 12px;
+      color: var(--text-muted); font-size: 0.78rem; font-weight: 500; margin: 24px 0;
+    }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    .help-text { font-size: 0.78rem; color: var(--text-muted); margin-top: 5px; }
+
+    .polling-indicator { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--blue); }
+    .polling-ring {
+      width: 10px; height: 10px; border-radius: 50%;
+      border: 2px solid var(--blue); border-top-color: transparent;
+      animation: spin 0.8s linear infinite;
+    }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 6px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+  </style>
+</head>
+<body>
+
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+<div class="bg-orb bg-orb-3"></div>
+
+<div class="app-wrap">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">&#127942;</div>
+      <div>
+        <div class="logo-text">CertGen</div>
+        <div class="logo-sub">Bulk Certificate Generator</div>
+      </div>
+    </div>
+    <div class="api-status" id="api-status-badge">
+      <div class="status-dot" id="api-dot"></div>
+      <span id="api-status-text">Connecting&hellip;</span>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="create" id="tab-create">&#10022; Create Job</button>
+    <button class="tab-btn" data-tab="track"  id="tab-track">&#128202; Track Job</button>
+    <button class="tab-btn" data-tab="history" id="tab-history">&#128203; History</button>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- Create Job                                                  -->
+  <!-- ========================================================= -->
+  <div class="tab-panel active" id="panel-create">
+    <div class="section-label">Step 1 &mdash; Job Details</div>
+    <h2>Create Certificate Job</h2>
+    <p class="section-desc">Fill in the event details and add recipients below. Certificates are generated in the background.</p>
+
+    <div class="card">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="event-name">Event / Course Name <span style="color:var(--red)">*</span></label>
+          <input type="text" id="event-name" placeholder="e.g. Advanced Python Workshop" maxlength="200" />
+        </div>
+        <div class="form-group">
+          <label for="issuer">Issuing Organisation <span style="color:var(--red)">*</span></label>
+          <input type="text" id="issuer" placeholder="e.g. TNS Foundation" maxlength="200" />
+        </div>
+      </div>
+
+      <div class="divider">Recipients</div>
+
+      <div class="csv-drop" id="csv-drop-zone">
+        <div class="drop-icon">&#128196;</div>
+        <p><span>Click to browse</span> or drag &amp; drop a CSV file here</p>
+        <p style="margin-top:6px;font-size:0.78rem;color:var(--text-muted)">Format: name, email &mdash; one per line, header row optional</p>
+        <input type="file" id="csv-file-input" accept=".csv,.txt" />
+      </div>
+
+      <div class="add-recipient-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label for="r-name">Recipient Name</label>
+          <input type="text" id="r-name" placeholder="Full name" maxlength="200" />
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label for="r-email">Email Address</label>
+          <input type="text" id="r-email" placeholder="email@example.com" />
+        </div>
+        <button class="btn btn-outline btn-sm" id="btn-add-recipient">+ Add</button>
+      </div>
+
+      <div style="margin-top:20px">
+        <div class="recipients-header">
+          <label style="margin:0">Recipients List</label>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="recipients-count" id="rec-count">0 recipients</span>
+            <button class="btn btn-danger btn-sm" id="btn-clear-all">Clear All</button>
+          </div>
+        </div>
+        <div class="recipients-table-wrap" id="recipients-table-wrap">
+          <div class="empty-state" id="recipients-empty">
+            <div class="icon">&#128101;</div>
+            <div>No recipients yet. Add some above or import a CSV.</div>
+          </div>
+          <table id="recipients-table" class="hidden">
+            <thead><tr><th>#</th><th>Name</th><th>Email</th><th></th></tr></thead>
+            <tbody id="recipients-tbody"></tbody>
+          </table>
+        </div>
+        <p class="help-text">Maximum 500 recipients per job.</p>
+      </div>
+
+      <div class="flex-end mt-24">
+        <button class="btn btn-outline" id="btn-reset-form">Reset</button>
+        <button class="btn btn-gold" id="btn-submit-job">
+          <span id="submit-icon">&#128640;</span>
+          <span id="submit-text">Generate Certificates</span>
+          <div class="spinner hidden" id="submit-spinner"></div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- Track Job                                                   -->
+  <!-- ========================================================= -->
+  <div class="tab-panel" id="panel-track">
+    <div class="section-label">Live Tracking</div>
+    <h2>Track Job Progress</h2>
+    <p class="section-desc">Enter a Job ID to monitor generation progress and download certificates.</p>
+
+    <div class="lookup-bar">
+      <input type="text" id="lookup-job-id" placeholder="Paste Job ID here&hellip;" />
+      <button class="btn btn-primary" id="btn-lookup">
+        Track
+        <div class="spinner hidden" id="lookup-spinner"></div>
+      </button>
+    </div>
+
+    <div id="job-status-card" class="hidden">
+      <div class="card">
+        <div class="flex-between" style="margin-bottom:16px">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+              <h2 id="status-event-name" style="margin-bottom:0">&mdash;</h2>
+              <span class="badge" id="status-badge">&mdash;</span>
+            </div>
+            <div style="color:var(--text-secondary);font-size:0.88rem">
+              Issued by <strong id="status-issuer">&mdash;</strong> &bull; Created <span id="status-created">&mdash;</span>
+            </div>
+          </div>
+          <div class="polling-indicator hidden" id="polling-indicator">
+            <div class="polling-ring"></div><span>Live</span>
+          </div>
+        </div>
+
+        <div class="job-id-box">
+          <span style="flex:1" id="status-job-id">&mdash;</span>
+          <button class="copy-btn" title="Copy Job ID" id="btn-copy-job-id">&#128203;</button>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-value" id="stat-total">&mdash;</div><div class="stat-label">Total</div></div>
+          <div class="stat-card"><div class="stat-value blue" id="stat-processed">&mdash;</div><div class="stat-label">Processed</div></div>
+          <div class="stat-card"><div class="stat-value green" id="stat-success">&mdash;</div><div class="stat-label">Successful</div></div>
+          <div class="stat-card"><div class="stat-value red" id="stat-failed">&mdash;</div><div class="stat-label">Failed</div></div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:0.82rem;color:var(--text-secondary)">Progress</span>
+          <span style="font-size:0.82rem;font-weight:700;color:var(--blue)" id="stat-pct">0%</span>
+        </div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+
+        <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" id="btn-refresh-manual">&#8635; Refresh</button>
+          <button class="btn btn-primary btn-sm" id="btn-view-certs">View Certificates</button>
+        </div>
+      </div>
+
+      <div id="certs-section" class="hidden" style="margin-top:24px">
+        <div class="section-label">Certificates</div>
+        <div class="flex-between" style="margin-bottom:16px">
+          <h2 style="margin-bottom:0">All Recipients</h2>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="cert-search" placeholder="Filter&hellip;" style="width:180px;padding:8px 12px;font-size:0.82rem" />
+            <button class="btn btn-primary btn-sm" id="btn-download-all">&#11015; Download All</button>
+          </div>
+        </div>
+        <div class="cert-list" id="cert-list">
+          <div class="empty-state"><div class="icon">&#128194;</div><div>No certificates yet.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="track-empty" style="text-align:center;padding:60px 20px;color:var(--text-muted)">
+      <div style="font-size:4rem;margin-bottom:16px">&#128269;</div>
+      <div style="font-size:1rem;font-weight:600;color:var(--text-secondary);margin-bottom:8px">Enter a Job ID to get started</div>
+      <div style="font-size:0.88rem">After creating a job, the Track tab opens automatically.</div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- History                                                     -->
+  <!-- ========================================================= -->
+  <div class="tab-panel" id="panel-history">
+    <div class="section-label">Recent Jobs</div>
+    <div class="flex-between" style="margin-bottom:8px">
+      <h2 style="margin-bottom:0">Job History</h2>
+      <button class="btn btn-outline btn-sm" id="btn-clear-history">&#128465; Clear History</button>
+    </div>
+    <p class="section-desc">Jobs submitted in this browser session. Click any row to track it.</p>
+    <div id="history-list">
+      <div class="empty-state" style="padding:60px 20px" id="history-empty">
+        <div class="icon">&#128203;</div>
+        <div>No jobs submitted yet. Create one in the <strong>Create Job</strong> tab.</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app-wrap -->
+
+<div id="toast-container"></div>
+
+<script>
+'use strict';
+
+const API_BASE        = 'http://localhost:8000';
+const POLL_INTERVAL   = 2500;
+const MAX_RECIPIENTS  = 500;
+
+let recipients     = [];
+let jobHistory     = JSON.parse(localStorage.getItem('certgen_history') || '[]');
+let pollTimer      = null;
+let currentJobId   = null;
+let allCerts       = [];
+
+/* ── tiny helpers ─────────────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+const isEmail = s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
+
+function escHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+/* ── toast ────────────────────────────────────────────────────────────── */
+function toast(type, title, msg, ms = 4000) {
+  const icons = { success:'✅', error:'❌', info:'ℹ️', warning:'⚠️' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<div class="toast-icon">${icons[type]||'💬'}</div>
+    <div class="toast-body"><div class="toast-title">${escHtml(title)}</div>${msg ? `<div class="toast-msg">${escHtml(msg)}</div>` : ''}</div>`;
+  $('toast-container').prepend(el);
+  setTimeout(() => { el.classList.add('removing'); setTimeout(() => el.remove(), 350); }, ms);
+}
+
+/* ── API ──────────────────────────────────────────────────────────────── */
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res  = await fetch(`${API_BASE}${path}`, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const d = data.detail;
+    throw new Error(typeof d === 'string' ? d : JSON.stringify(d) || `HTTP ${res.status}`);
+  }
+  return data;
+}
+
+/* ── health ───────────────────────────────────────────────────────────── */
+async function checkHealth() {
+  try {
+    await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(4000) });
+    $('api-dot').className = 'status-dot online';
+    $('api-status-text').textContent = 'API Online';
+  } catch {
+    $('api-dot').className = 'status-dot offline';
+    $('api-status-text').textContent = 'API Offline';
+  }
+}
+checkHealth();
+setInterval(checkHealth, 15000);
+
+/* ── tabs ─────────────────────────────────────────────────────────────── */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    $(`panel-${tab}`).classList.add('active');
+    if (tab === 'history') renderHistory();
+  });
+});
+
+/* ══════════════════════ Recipients ══════════════════════════════════════ */
+function renderRecipients() {
+  const tbody = $('recipients-tbody');
+  const table = $('recipients-table');
+  const empty = $('recipients-empty');
+  $('rec-count').textContent = `${recipients.length} recipient${recipients.length !== 1 ? 's' : ''}`;
+  if (recipients.length === 0) { table.classList.add('hidden'); empty.classList.remove('hidden'); return; }
+  table.classList.remove('hidden'); empty.classList.add('hidden');
+  tbody.innerHTML = '';
+  recipients.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="color:var(--text-muted);width:40px">${i+1}</td>
+      <td>${escHtml(r.name)}</td>
+      <td style="color:var(--text-secondary)">${escHtml(r.email)}</td>
+      <td style="width:40px;text-align:right"><button class="btn-icon" data-idx="${i}">&#x2715;</button></td>`;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('.btn-icon').forEach(b => {
+    b.addEventListener('click', () => { recipients.splice(+b.dataset.idx, 1); renderRecipients(); });
+  });
+}
+
+function addRecipient(name, email) {
+  name  = name.trim(); email = email.trim().toLowerCase();
+  if (!name)          { toast('warning','Missing name','Recipient name is required.'); return false; }
+  if (!isEmail(email)){ toast('warning','Invalid email',`"${email}" is not a valid email.`); return false; }
+  if (recipients.length >= MAX_RECIPIENTS) { toast('warning','Limit reached','Maximum 500 recipients per job.'); return false; }
+  if (recipients.find(r => r.email === email)) { toast('warning','Duplicate',`${email} is already added.`); return false; }
+  recipients.push({ name, email });
+  renderRecipients();
+  return true;
+}
+
+$('btn-add-recipient').addEventListener('click', () => {
+  if (addRecipient($('r-name').value, $('r-email').value)) {
+    $('r-name').value = $('r-email').value = '';
+    $('r-name').focus();
+  }
+});
+$('r-email').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-add-recipient').click(); });
+$('btn-clear-all').addEventListener('click', () => {
+  if (!recipients.length || !confirm(`Remove all ${recipients.length} recipients?`)) return;
+  recipients = []; renderRecipients();
+});
+$('btn-reset-form').addEventListener('click', () => {
+  if (!confirm('Reset the entire form?')) return;
+  $('event-name').value = $('issuer').value = '';
+  recipients = []; renderRecipients();
+});
+
+/* ── CSV ──────────────────────────────────────────────────────────────── */
+function processCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  let added = 0, skipped = 0;
+  lines.forEach((line, idx) => {
+    const parts = line.split(',').map(p => p.trim().replace(/^"|"$/g,''));
+    if (parts.length < 2) { skipped++; return; }
+    if (idx === 0 && /^name$/i.test(parts[0])) return;
+    const [name, email] = parts;
+    if (!name || !isEmail(email) || recipients.length >= MAX_RECIPIENTS || recipients.find(r => r.email === email.toLowerCase())) { skipped++; return; }
+    recipients.push({ name, email: email.toLowerCase() }); added++;
+  });
+  renderRecipients();
+  if (added) toast('success', `${added} recipients added`, skipped ? `${skipped} skipped.` : '');
+  else toast('warning','No recipients added','Check CSV: name, email');
+}
+
+const csvDrop  = $('csv-drop-zone');
+const csvInput = $('csv-file-input');
+csvDrop.addEventListener('click', () => csvInput.click());
+csvInput.addEventListener('change', () => {
+  if (!csvInput.files[0]) return;
+  const r = new FileReader(); r.onload = e => processCSV(e.target.result); r.readAsText(csvInput.files[0]); csvInput.value = '';
+});
+csvDrop.addEventListener('dragover', e => { e.preventDefault(); csvDrop.classList.add('drag-over'); });
+csvDrop.addEventListener('dragleave', () => csvDrop.classList.remove('drag-over'));
+csvDrop.addEventListener('drop', e => {
+  e.preventDefault(); csvDrop.classList.remove('drag-over');
+  if (!e.dataTransfer.files[0]) return;
+  const r = new FileReader(); r.onload = ev => processCSV(ev.target.result); r.readAsText(e.dataTransfer.files[0]);
+});
+
+/* ══════════════════════ Submit Job ══════════════════════════════════════ */
+$('btn-submit-job').addEventListener('click', async () => {
+  const eventName = $('event-name').value.trim();
+  const issuer    = $('issuer').value.trim();
+  if (!eventName)          { toast('warning','Missing field','Event name is required.'); $('event-name').focus(); return; }
+  if (!issuer)             { toast('warning','Missing field','Issuing organisation is required.'); $('issuer').focus(); return; }
+  if (!recipients.length)  { toast('warning','No recipients','Add at least one recipient.'); return; }
+
+  $('btn-submit-job').disabled = true;
+  $('submit-icon').classList.add('hidden');
+  $('submit-text').textContent = 'Submitting…';
+  $('submit-spinner').classList.remove('hidden');
+
+  try {
+    const data = await api('POST', '/api/jobs/', {
+      event_name: eventName, issuer,
+      recipients: recipients.map(r => ({ name: r.name, email: r.email })),
+    });
+    toast('success','Job created!',`${data.total} certificates queued.`);
+    const entry = { job_id: data.job_id, event_name: eventName, issuer, total: data.total, created_at: new Date().toISOString() };
+    jobHistory.unshift(entry);
+    if (jobHistory.length > 50) jobHistory.length = 50;
+    localStorage.setItem('certgen_history', JSON.stringify(jobHistory));
+    $('lookup-job-id').value = data.job_id;
+    document.querySelector('[data-tab="track"]').click();
+    loadJobStatus(data.job_id);
+  } catch (err) {
+    toast('error','Submission failed', err.message);
+  } finally {
+    $('btn-submit-job').disabled = false;
+    $('submit-icon').classList.remove('hidden');
+    $('submit-text').textContent = 'Generate Certificates';
+    $('submit-spinner').classList.add('hidden');
+  }
+});
+
+/* ══════════════════════ Tracking ════════════════════════════════════════ */
+function badgeClass(s) {
+  const m = { QUEUED:'badge-queued', RUNNING:'badge-running', COMPLETED:'badge-completed', FAILED:'badge-failed', PENDING:'badge-pending', SUCCESS:'badge-success', PROCESSING:'badge-running' };
+  return m[(s||'').toUpperCase()] || 'badge-queued';
+}
+function badgeDot(s) { return ['running','processing'].includes((s||'').toLowerCase()) ? '<span class="badge-dot"></span>' : ''; }
+
+function updateStatusCard(job) {
+  $('status-event-name').textContent = job.event_name;
+  $('status-issuer').textContent     = job.issuer;
+  $('status-created').textContent    = formatDate(job.created_at);
+  $('status-job-id').textContent     = job.job_id;
+  const b = $('status-badge');
+  b.className = `badge ${badgeClass(job.status)}`;
+  b.innerHTML = `${badgeDot(job.status)} ${job.status}`;
+  $('stat-total').textContent     = job.total;
+  $('stat-processed').textContent = job.processed;
+  $('stat-success').textContent   = job.successful;
+  $('stat-failed').textContent    = job.failed;
+  const pct = job.progress_pct ?? 0;
+  $('stat-pct').textContent        = `${pct.toFixed(1)}%`;
+  $('progress-fill').style.width   = `${pct}%`;
+}
+
+async function loadJobStatus(jobId) {
+  if (!jobId) return;
+  jobId = jobId.trim();
+  $('track-empty').classList.add('hidden');
+  $('job-status-card').classList.remove('hidden');
+  try {
+    const job = await api('GET', `/api/jobs/${jobId}`);
+    updateStatusCard(job);
+    const done = ['COMPLETED','FAILED'].includes((job.status||'').toUpperCase());
+    $('polling-indicator').classList.toggle('hidden', done);
+    stopPolling();
+    if (!done) startPolling(jobId);
+  } catch (err) {
+    toast('error','Not found', err.message);
+    $('track-empty').classList.remove('hidden');
+    $('job-status-card').classList.add('hidden');
+  }
+}
+
+function startPolling(jobId) {
+  currentJobId = jobId;
+  pollTimer = setInterval(async () => {
+    try {
+      const job = await api('GET', `/api/jobs/${jobId}`);
+      updateStatusCard(job);
+      if (['COMPLETED','FAILED'].includes((job.status||'').toUpperCase())) {
+        stopPolling();
+        $('polling-indicator').classList.add('hidden');
+        toast('info','Job finished',`Status: ${job.status}`);
+        if (!$('certs-section').classList.contains('hidden')) loadCertificates(jobId);
+      }
+    } catch { /* silent */ }
+  }, POLL_INTERVAL);
+}
+
+function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+$('btn-lookup').addEventListener('click', () => {
+  const id = $('lookup-job-id').value.trim();
+  if (!id) { toast('warning','No Job ID','Enter a job ID first.'); return; }
+  $('certs-section').classList.add('hidden');
+  loadJobStatus(id);
+});
+$('lookup-job-id').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-lookup').click(); });
+$('btn-refresh-manual').addEventListener('click', () => { const id = $('lookup-job-id').value.trim() || currentJobId; if (id) loadJobStatus(id); });
+$('btn-copy-job-id').addEventListener('click', () => {
+  const id = $('status-job-id').textContent;
+  navigator.clipboard.writeText(id).then(() => toast('success','Copied!', id));
+});
+
+$('btn-view-certs').addEventListener('click', () => {
+  const id = $('lookup-job-id').value.trim() || currentJobId;
+  if (!id) return;
+  $('certs-section').classList.remove('hidden');
+  $('certs-section').scrollIntoView({ behavior:'smooth', block:'start' });
+  loadCertificates(id);
+});
+
+async function loadCertificates(jobId) {
+  const list = $('cert-list');
+  list.innerHTML = '<div class="empty-state"><div class="polling-ring" style="margin:0 auto 8px;width:24px;height:24px;border-width:3px"></div><div>Loading…</div></div>';
+  try {
+    const data = await api('GET', `/api/jobs/${jobId}/certificates`);
+    allCerts = data.certificates;
+    renderCertList(allCerts);
+  } catch (err) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">&#10060;</div><div>${escHtml(err.message)}</div></div>`;
+  }
+}
+
+function renderCertList(certs) {
+  const list = $('cert-list');
+  if (!certs.length) { list.innerHTML = '<div class="empty-state"><div class="icon">&#128194;</div><div>No certificates found.</div></div>'; return; }
+  list.innerHTML = '';
+  certs.forEach(cert => {
+    const div = document.createElement('div');
+    div.className = `cert-item ${cert.status.toLowerCase()}`;
+    div.innerHTML = `
+      <div class="cert-info">
+        <div class="cert-name">${escHtml(cert.recipient_name)}</div>
+        <div class="cert-email">${escHtml(cert.recipient_email)}</div>
+        ${cert.error_message ? `<div class="cert-error">&#9888; ${escHtml(cert.error_message)}</div>` : ''}
+      </div>
+      <div class="cert-actions">
+        <span class="badge ${badgeClass(cert.status)}">${badgeDot(cert.status)} ${cert.status}</span>
+        ${cert.download_url ? `<a href="${cert.download_url}" download class="btn btn-outline btn-sm">&#11015; PDF</a>` : ''}
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+$('cert-search').addEventListener('input', () => {
+  const q = $('cert-search').value.toLowerCase();
+  renderCertList(allCerts.filter(c => c.recipient_name.toLowerCase().includes(q) || c.recipient_email.toLowerCase().includes(q)));
+});
+
+$('btn-download-all').addEventListener('click', () => {
+  const ok = allCerts.filter(c => c.download_url);
+  if (!ok.length) { toast('info','Nothing to download','No successful certificates yet.'); return; }
+  toast('info','Downloading…',`Opening ${ok.length} PDF(s). Allow pop-ups if prompted.`);
+  ok.forEach((cert, i) => setTimeout(() => {
+    const a = document.createElement('a');
+    a.href = cert.download_url; a.download = `certificate-${cert.certificate_id}.pdf`;
+    document.body.appendChild(a); a.click(); a.remove();
+  }, i * 300));
+});
+
+/* ══════════════════════ History ═════════════════════════════════════════ */
+function renderHistory() {
+  const container = $('history-list');
+  container.innerHTML = '';
+  if (!jobHistory.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state'; empty.style.padding = '60px 20px';
+    empty.innerHTML = '<div class="icon">&#128203;</div><div>No jobs submitted yet. Create one in the <strong>Create Job</strong> tab.</div>';
+    container.appendChild(empty); return;
+  }
+  jobHistory.forEach(entry => {
+    const div = document.createElement('div');
+    div.className = 'job-history-item';
+    div.innerHTML = `
+      <div class="job-info">
+        <h4>${escHtml(entry.event_name)}</h4>
+        <p>${escHtml(entry.issuer)} &bull; ${entry.total} recipients &bull; ${formatDate(entry.created_at)}</p>
+        <p style="font-family:monospace;font-size:0.75rem;color:var(--text-muted);margin-top:4px">${entry.job_id}</p>
+      </div>
+      <button class="btn btn-outline btn-sm" data-id="${entry.job_id}">Track &rarr;</button>`;
+    const go = () => { $('lookup-job-id').value = entry.job_id; document.querySelector('[data-tab="track"]').click(); loadJobStatus(entry.job_id); };
+    div.querySelector('button').addEventListener('click', e => { e.stopPropagation(); go(); });
+    div.addEventListener('click', go);
+    container.appendChild(div);
+  });
+}
+
+$('btn-clear-history')?.addEventListener('click', () => {
+  if (!jobHistory.length) {
+    toast('info', 'History Empty', 'No jobs in history to clear.');
+    return;
+  }
+  jobHistory = [];
+  localStorage.removeItem('certgen_history');
+  renderHistory();
+  toast('success', 'History Cleared', 'All job history has been reset.');
+});
+
+/* ── Init ─────────────────────────────────────────────────────────────── */
+renderRecipients();
+renderHistory();
+</script>
+</body>
+</html>
